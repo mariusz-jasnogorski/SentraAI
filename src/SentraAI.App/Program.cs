@@ -6,6 +6,7 @@ using SentraAI.Contracts;
 using SentraAI.Notifications;
 using SentraAI.Observability;
 using SentraAI.Persistence;
+using SentraAI.Integrations;
 
 // This application is intentionally a console/worker-style MVP.
 // It demonstrates the full architecture locally without requiring Azure, Vera Edge,
@@ -24,7 +25,11 @@ builder.Services.AddSentraAIObservability(builder.Configuration);
 // Persistence / context building.
 builder.Services.AddSingleton<InMemorySentraAIStore>();
 builder.Services.AddSingleton<SentraAIContextBuilder>();
-builder.Services.AddSingleton<FakeVeraDataSource>();
+
+// Smart home integration.
+// The application depends on ISmartHomeEventSource, not on Vera directly.
+// Change SmartHomeIntegration:Provider from "Fake" to "Vera" to read real Vera Plus/Edge data.
+builder.Services.AddSentraAISmartHomeIntegration(builder.Configuration);
 
 // Core agents.
 builder.Services.AddSingleton<ISentraAIAgent, RuleAnomalyAgent>();
@@ -63,14 +68,15 @@ var host = builder.Build();
 
 var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SentraAI.App");
 var store = host.Services.GetRequiredService<InMemorySentraAIStore>();
-var fakeVera = host.Services.GetRequiredService<FakeVeraDataSource>();
+var eventSource = host.Services.GetRequiredService<ISmartHomeEventSource>();
 var contextBuilder = host.Services.GetRequiredService<SentraAIContextBuilder>();
 var pipeline = host.Services.GetRequiredService<SentraAIAgentPipeline>();
 var communication = host.Services.GetRequiredService<CommunicationAgent>();
 var notifications = host.Services.GetRequiredService<NotificationRouter>();
 
-logger.LogInformation("Generating demo Vera-like events...");
-store.AddEvents(fakeVera.GenerateDemoEvents());
+logger.LogInformation("Reading events from configured smart home source...");
+var sourceEvents = await eventSource.ReadEventsAsync(CancellationToken.None);
+store.AddEvents(sourceEvents);
 
 logger.LogInformation("Building SentraAIContext...");
 var context = await contextBuilder.BuildAsync(CancellationToken.None);

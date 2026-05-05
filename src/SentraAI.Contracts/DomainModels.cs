@@ -77,3 +77,19 @@ public sealed record UserMessage(
     string Body,
     string Priority,
     DateTimeOffset CreatedAt);
+
+/// <summary>
+/// Generic abstraction for any smart home platform that can produce normalized SentraAI events.
+///
+/// This is intentionally vendor-neutral. Vera Plus/Edge, Home Assistant, Fibaro, MQTT brokers,
+/// KNX gateways or any future integration should implement this contract and return HomeEvent
+/// records. The agent pipeline should never depend directly on a vendor API.
+/// </summary>
+public interface ISmartHomeEventSource
+{
+    /// <summary>
+    /// Reads the latest events or current device state from a smart home platform and converts it
+    /// into SentraAI's normalized event model.
+    /// </summary>
+    Task<IReadOnlyList<HomeEvent>> ReadEventsAsync(CancellationToken cancellationToken);
+}

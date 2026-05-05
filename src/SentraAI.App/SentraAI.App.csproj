@@ -9,6 +9,7 @@
     <ProjectReference Include="..\SentraAI.Agents\SentraAI.Agents.csproj" />
     <ProjectReference Include="..\SentraAI.Notifications\SentraAI.Notifications.csproj" />
     <ProjectReference Include="..\SentraAI.Observability\SentraAI.Observability.csproj" />
+    <ProjectReference Include="..\SentraAI.Integrations\SentraAI.Integrations.csproj" />
   </ItemGroup>
 
   <ItemGroup>
