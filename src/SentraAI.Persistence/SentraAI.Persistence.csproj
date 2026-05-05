@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\SentraAI.Contracts\SentraAI.Contracts.csproj" />
+  </ItemGroup>
+</Project>
