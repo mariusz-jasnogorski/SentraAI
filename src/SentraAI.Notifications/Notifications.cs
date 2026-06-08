@@ -2,79 +2,26 @@ using SentraAI.Contracts;
 
 namespace SentraAI.Notifications;
 
-/// <summary>
-/// Converts recommendations into user-facing messages.
-///
-/// In a production system this class could call an LLM to rewrite technical findings into
-/// friendlier language. For critical alerts, templates are usually safer than LLM text.
-/// </summary>
-public sealed class CommunicationAgent
+public sealed class CommunicationAgent : ICommunicationAgent
 {
-    public UserMessage CreateMessage(Recommendation recommendation)
+    public Task<UserMessage> CreateMessageAsync(Recommendation recommendation, CancellationToken cancellationToken)
     {
-        var priority = recommendation.Finding.Severity switch
-        {
-            "Critical" => "Critical",
-            "High" => "High",
-            "Medium" => "Medium",
-            _ => "Low"
-        };
+        var prefix = recommendation.RequiresUserApproval ? "Approval required" : "SentraAI recommendation";
+        var body = recommendation.RequiresUserApproval
+            ? $"{recommendation.Message}\n\nNo physical smart-home action was executed. Review and approve manually."
+            : recommendation.Message;
 
-        return new UserMessage(
-            Guid.NewGuid(),
-            recommendation.MessageTitle,
-            recommendation.MessageBody,
-            priority,
-            DateTimeOffset.UtcNow);
+        return Task.FromResult(new UserMessage($"{prefix}: {recommendation.Title}", body, AgentFindingSeverity.Medium, DateTimeOffset.UtcNow));
     }
 }
 
-/// <summary>
-/// Notification channel abstraction.
-/// Add implementations for dashboard, email, push, SMS, Telegram, etc.
-/// </summary>
-public interface INotificationChannel
-{
-    Task SendAsync(UserMessage message, CancellationToken cancellationToken);
-}
-
-/// <summary>
-/// Local demo notification channel.
-/// </summary>
 public sealed class ConsoleNotificationChannel : INotificationChannel
 {
     public Task SendAsync(UserMessage message, CancellationToken cancellationToken)
     {
+        Console.WriteLine($"[{message.CreatedAt:O}] {message.Title}");
+        Console.WriteLine(message.Body);
         Console.WriteLine();
-        Console.WriteLine("=== USER MESSAGE ===");
-        Console.WriteLine($"Priority: {message.Priority}");
-        Console.WriteLine($"Title:    {message.Title}");
-        Console.WriteLine($"Body:     {message.Body}");
-        Console.WriteLine("====================");
-        Console.WriteLine();
-
         return Task.CompletedTask;
-    }
-}
-
-/// <summary>
-/// Routes messages to one or more channels.
-/// In production this is the right place for anti-spam rules and user preferences.
-/// </summary>
-public sealed class NotificationRouter
-{
-    private readonly IEnumerable<INotificationChannel> _channels;
-
-    public NotificationRouter(IEnumerable<INotificationChannel> channels)
-    {
-        _channels = channels;
-    }
-
-    public async Task RouteAsync(UserMessage message, CancellationToken cancellationToken)
-    {
-        foreach (var channel in _channels)
-        {
-            await channel.SendAsync(message, cancellationToken);
-        }
     }
 }

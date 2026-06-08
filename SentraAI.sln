@@ -2,21 +2,25 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.App", "src\SentraAI.App\SentraAI.App.csproj", "{11111111-1111-1111-1111-111111111111}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Contracts", "src\SentraAI.Contracts\SentraAI.Contracts.csproj", "{5EF40431-BB4D-4858-9D74-0ACF9F41562C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Contracts", "src\SentraAI.Contracts\SentraAI.Contracts.csproj", "{22222222-2222-2222-2222-222222222222}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Persistence", "src\SentraAI.Persistence\SentraAI.Persistence.csproj", "{259AB8ED-0472-4C71-A976-94FAD218385A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Agents", "src\SentraAI.Agents\SentraAI.Agents.csproj", "{33333333-3333-3333-3333-333333333333}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Integrations", "src\SentraAI.Integrations\SentraAI.Integrations.csproj", "{9FC16146-38C1-477D-86C4-E107EDAC6E7B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Notifications", "src\SentraAI.Notifications\SentraAI.Notifications.csproj", "{44444444-4444-4444-4444-444444444444}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Agents", "src\SentraAI.Agents\SentraAI.Agents.csproj", "{6B6AA46C-F5A3-4942-8F58-951D9561E906}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Observability", "src\SentraAI.Observability\SentraAI.Observability.csproj", "{55555555-5555-5555-5555-555555555555}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Notifications", "src\SentraAI.Notifications\SentraAI.Notifications.csproj", "{CA1D56E1-20DC-4DFD-9111-EF6136627D44}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Persistence", "src\SentraAI.Persistence\SentraAI.Persistence.csproj", "{66666666-6666-6666-6666-666666666666}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Observability", "src\SentraAI.Observability\SentraAI.Observability.csproj", "{4097FF22-71A4-46A5-8524-1E3E391EBE35}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Integrations", "src\SentraAI.Integrations\SentraAI.Integrations.csproj", "{88888888-8888-8888-8888-888888888888}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.App", "src\SentraAI.App\SentraAI.App.csproj", "{623D79BF-AF9F-429E-9DD5-2C6E5B554FEE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Agents.Tests", "tests\SentraAI.Agents.Tests\SentraAI.Agents.Tests.csproj", "{77777777-7777-7777-7777-777777777777}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Api", "src\SentraAI.Api\SentraAI.Api.csproj", "{9CD91513-87F8-4DC0-B2D3-DAE1DE0C52C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Connector.Worker", "src\SentraAI.Connector.Worker\SentraAI.Connector.Worker.csproj", "{4B8CD617-0EA6-42AE-B03B-B325BD755EF2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SentraAI.Agents.Tests", "tests\SentraAI.Agents.Tests\SentraAI.Agents.Tests.csproj", "{85E1B6BD-5ED8-4648-AD98-BD045BF508B6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,37 +28,45 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{11111111-1111-1111-1111-111111111111}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{11111111-1111-1111-1111-111111111111}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{11111111-1111-1111-1111-111111111111}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{11111111-1111-1111-1111-111111111111}.Release|Any CPU.Build.0 = Release|Any CPU
-		{22222222-2222-2222-2222-222222222222}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{22222222-2222-2222-2222-222222222222}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{22222222-2222-2222-2222-222222222222}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{22222222-2222-2222-2222-222222222222}.Release|Any CPU.Build.0 = Release|Any CPU
-		{33333333-3333-3333-3333-333333333333}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{33333333-3333-3333-3333-333333333333}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{33333333-3333-3333-3333-333333333333}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{33333333-3333-3333-3333-333333333333}.Release|Any CPU.Build.0 = Release|Any CPU
-		{44444444-4444-4444-4444-444444444444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{44444444-4444-4444-4444-444444444444}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{44444444-4444-4444-4444-444444444444}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{44444444-4444-4444-4444-444444444444}.Release|Any CPU.Build.0 = Release|Any CPU
-		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.Build.0 = Release|Any CPU
-		{88888888-8888-8888-8888-888888888888}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{88888888-8888-8888-8888-888888888888}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.Build.0 = Release|Any CPU
-		{77777777-7777-7777-7777-777777777777}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{77777777-7777-7777-7777-777777777777}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{77777777-7777-7777-7777-777777777777}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{77777777-7777-7777-7777-777777777777}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5EF40431-BB4D-4858-9D74-0ACF9F41562C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5EF40431-BB4D-4858-9D74-0ACF9F41562C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5EF40431-BB4D-4858-9D74-0ACF9F41562C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5EF40431-BB4D-4858-9D74-0ACF9F41562C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{259AB8ED-0472-4C71-A976-94FAD218385A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{259AB8ED-0472-4C71-A976-94FAD218385A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{259AB8ED-0472-4C71-A976-94FAD218385A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{259AB8ED-0472-4C71-A976-94FAD218385A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FC16146-38C1-477D-86C4-E107EDAC6E7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FC16146-38C1-477D-86C4-E107EDAC6E7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FC16146-38C1-477D-86C4-E107EDAC6E7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FC16146-38C1-477D-86C4-E107EDAC6E7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B6AA46C-F5A3-4942-8F58-951D9561E906}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B6AA46C-F5A3-4942-8F58-951D9561E906}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B6AA46C-F5A3-4942-8F58-951D9561E906}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B6AA46C-F5A3-4942-8F58-951D9561E906}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA1D56E1-20DC-4DFD-9111-EF6136627D44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA1D56E1-20DC-4DFD-9111-EF6136627D44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA1D56E1-20DC-4DFD-9111-EF6136627D44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA1D56E1-20DC-4DFD-9111-EF6136627D44}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4097FF22-71A4-46A5-8524-1E3E391EBE35}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4097FF22-71A4-46A5-8524-1E3E391EBE35}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4097FF22-71A4-46A5-8524-1E3E391EBE35}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4097FF22-71A4-46A5-8524-1E3E391EBE35}.Release|Any CPU.Build.0 = Release|Any CPU
+		{623D79BF-AF9F-429E-9DD5-2C6E5B554FEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{623D79BF-AF9F-429E-9DD5-2C6E5B554FEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{623D79BF-AF9F-429E-9DD5-2C6E5B554FEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{623D79BF-AF9F-429E-9DD5-2C6E5B554FEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CD91513-87F8-4DC0-B2D3-DAE1DE0C52C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CD91513-87F8-4DC0-B2D3-DAE1DE0C52C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CD91513-87F8-4DC0-B2D3-DAE1DE0C52C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CD91513-87F8-4DC0-B2D3-DAE1DE0C52C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B8CD617-0EA6-42AE-B03B-B325BD755EF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B8CD617-0EA6-42AE-B03B-B325BD755EF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B8CD617-0EA6-42AE-B03B-B325BD755EF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B8CD617-0EA6-42AE-B03B-B325BD755EF2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85E1B6BD-5ED8-4648-AD98-BD045BF508B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85E1B6BD-5ED8-4648-AD98-BD045BF508B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85E1B6BD-5ED8-4648-AD98-BD045BF508B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85E1B6BD-5ED8-4648-AD98-BD045BF508B6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

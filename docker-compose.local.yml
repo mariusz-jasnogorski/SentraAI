@@ -1,0 +1,23 @@
+services:
+  sentraai-api:
+    build:
+      context: .
+      dockerfile: src/SentraAI.Api/Dockerfile
+    ports:
+      - "5100:8080"
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      EventPublishing__ApiKey: "dev-local-key"
+
+  sentraai-connector:
+    build:
+      context: .
+      dockerfile: src/SentraAI.Connector.Worker/Dockerfile
+    depends_on:
+      - sentraai-api
+    environment:
+      SmartHomeIntegration__Provider: "Fake"
+      EventPublishing__Mode: "Http"
+      EventPublishing__Endpoint: "http://sentraai-api:8080/api/home-events"
+      EventPublishing__ApiKey: "dev-local-key"
+      Connector__PollingIntervalSeconds: "30"

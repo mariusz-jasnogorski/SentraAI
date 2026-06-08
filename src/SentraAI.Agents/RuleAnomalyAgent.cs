@@ -2,58 +2,48 @@ using SentraAI.Contracts;
 
 namespace SentraAI.Agents;
 
-/// <summary>
-/// Fast, deterministic anomaly detector.
-///
-/// This type of agent should be used before LLM analysis because it is:
-/// - cheap
-/// - predictable
-/// - easy to test
-/// - safe for critical conditions
-///
-/// The LLM agent should complement this, not replace it.
-/// </summary>
 public sealed class RuleAnomalyAgent : ISentraAIAgent
 {
-    public Task<AgentFinding?> AnalyzeAsync(SentraAIContext context, CancellationToken cancellationToken)
+    public string Name => nameof(RuleAnomalyAgent);
+
+    public Task<IReadOnlyList<AgentFinding>> AnalyzeAsync(SentraAIContext context, CancellationToken cancellationToken)
     {
-        // Find rooms where a window is currently open.
-        var openWindows = context.Devices
-            .Where(x => x.Type == "Window" && x.Value.Equals("Open", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var findings = new List<AgentFinding>();
+        var now = DateTimeOffset.UtcNow;
 
-        foreach (var window in openWindows)
+        foreach (var evt in context.RecentEvents.Where(x => x.Type is HomeEventType.DoorOpened or HomeEventType.WindowOpened))
         {
-            // Check if heating is still active in the same room.
-            var heatingOn = context.Devices.Any(x =>
-                x.Room == window.Room &&
-                x.Type == "Heating" &&
-                x.Value.Equals("On", StringComparison.OrdinalIgnoreCase));
+            var matchingHeat = context.Devices.FirstOrDefault(d =>
+                d.Room.Equals(evt.Room, StringComparison.OrdinalIgnoreCase) &&
+                d.DeviceName.Contains("thermostat", StringComparison.OrdinalIgnoreCase));
 
-            if (!heatingOn)
-                continue;
-
-            // Deterministic finding. No LLM is needed for this obvious rule.
-            var finding = new AgentFinding(
-                Type: "Anomaly",
-                Title: "Open window while heating is active",
-                Description: $"The window in {window.Room} is open while heating is still active.",
-                Severity: "Medium",
-                Confidence: 0.95,
-                Evidence:
-                [
-                    $"Window state in {window.Room}: Open",
-                    $"Heating state in {window.Room}: On"
-                ],
-                RecommendedActions:
-                [
-                    "Notify the user",
-                    $"Suggest turning off heating in {window.Room}"
-                ]);
-
-            return Task.FromResult<AgentFinding?>(finding);
+            if (matchingHeat is not null && double.TryParse(matchingHeat.CurrentValue, out var temp) && temp > 22)
+            {
+                findings.Add(new AgentFinding(
+                    Guid.NewGuid().ToString("N"), Name, "Open contact while heating is high",
+                    $"{evt.DeviceName} is open in {evt.Room} while thermostat reports {temp:0.0}°C.",
+                    AgentFindingSeverity.Medium, 0.78,
+                    [new AgentEvidence(evt.Source, $"{evt.DeviceName}: {evt.Value}", evt.OccurredAt),
+                     new AgentEvidence("DeviceState", $"{matchingHeat.DeviceName}: {matchingHeat.CurrentValue}", matchingHeat.LastUpdatedAt)],
+                    RecommendationActionType.NotifyUser));
+            }
         }
 
-        return Task.FromResult<AgentFinding?>(null);
+        var nightGarageMotion = context.RecentEvents.FirstOrDefault(e =>
+            e.Type == HomeEventType.MotionDetected &&
+            e.Room.Contains("garage", StringComparison.OrdinalIgnoreCase) &&
+            (now.Hour >= 22 || now.Hour <= 5));
+
+        if (nightGarageMotion is not null)
+        {
+            findings.Add(new AgentFinding(
+                Guid.NewGuid().ToString("N"), Name, "Unexpected night motion",
+                $"Motion was detected in {nightGarageMotion.Room} during night hours.",
+                AgentFindingSeverity.High, 0.72,
+                [new AgentEvidence(nightGarageMotion.Source, $"{nightGarageMotion.DeviceName}: {nightGarageMotion.Value}", nightGarageMotion.OccurredAt)],
+                RecommendationActionType.RequestApproval));
+        }
+
+        return Task.FromResult<IReadOnlyList<AgentFinding>>(findings);
     }
 }

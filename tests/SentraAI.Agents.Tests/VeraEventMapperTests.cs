@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+using SentraAI.Contracts;
 using SentraAI.Integrations;
 using Xunit;
 
@@ -7,38 +7,24 @@ namespace SentraAI.Agents.Tests;
 public sealed class VeraEventMapperTests
 {
     [Fact]
-    public void MapSDataJson_ShouldMapVeraDevicesToNormalizedEvents()
+    public void Map_maps_temperature_device()
     {
-        var json = """
-        {
-          "rooms": [
-            { "id": 1, "name": "LivingRoom" }
-          ],
-          "devices": [
-            {
-              "id": 12,
-              "name": "Living Room Temperature",
-              "room": 1,
-              "category": 17,
-              "temperature": "21.5"
-            },
-            {
-              "id": 13,
-              "name": "Living Room Window",
-              "room": 1,
-              "category": 4,
-              "tripped": "1"
-            }
-          ]
-        }
-        """;
+        var device = new VeraDevice { Id = 1, Name = "Thermostat", Room = "Living", Temperature = "23.5" };
 
-        var mapper = new VeraEventMapper(Options.Create(new VeraOptions()));
+        var result = VeraEventMapper.Map(device, DateTimeOffset.UtcNow);
 
-        var events = mapper.MapSDataJson(json);
+        Assert.Equal(HomeEventType.TemperatureChanged, result.Type);
+        Assert.Equal("23.5", result.Value);
+    }
 
-        Assert.Equal(2, events.Count);
-        Assert.Contains(events, x => x.Type == "Temperature" && x.Value == "21.5" && x.Room == "LivingRoom");
-        Assert.Contains(events, x => x.Type == "Window" && x.Value == "Open" && x.Room == "LivingRoom");
+    [Fact]
+    public void Map_maps_tripped_device_as_motion()
+    {
+        var device = new VeraDevice { Id = 2, Name = "Motion", Room = "Garage", Tripped = "1" };
+
+        var result = VeraEventMapper.Map(device, DateTimeOffset.UtcNow);
+
+        Assert.Equal(HomeEventType.MotionDetected, result.Type);
+        Assert.Equal("true", result.Value);
     }
 }

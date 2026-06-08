@@ -1,124 +1,59 @@
 using SentraAI.Contracts;
+using System.Collections.Concurrent;
 
 namespace SentraAI.Persistence;
 
-/// <summary>
-/// Very small in-memory store used for local demo mode.
-///
-/// Production replacement:
-/// - PostgreSQL for HomeEvents, DeviceReadings, Findings, Recommendations
-/// - pgvector or Azure AI Search for situation memory / RAG
-/// - Redis for short-lived state/cache
-/// </summary>
-public sealed class InMemorySentraAIStore
+public sealed class InMemorySentraAIStore : ISentraAIStore
 {
+    private readonly object _lock = new();
     private readonly List<HomeEvent> _events = [];
     private readonly List<AgentFinding> _findings = [];
     private readonly List<Recommendation> _recommendations = [];
+    private readonly ConcurrentDictionary<string, DeviceState> _deviceStates = new();
 
-    private readonly object _lock = new();
-
-    /// <summary>
-    /// Appends normalized events. The store is append-only for event history.
-    /// </summary>
-    public void AddEvents(IEnumerable<HomeEvent> events)
+    public Task AddEventsAsync(IReadOnlyList<HomeEvent> events, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
             _events.AddRange(events);
+            foreach (var item in events)
+            {
+                _deviceStates[item.DeviceId] = new DeviceState(item.DeviceId, item.DeviceName, item.Room, item.Type.ToString(), item.Value, item.OccurredAt, item.Metadata);
+            }
         }
+        return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Returns the latest events. Agents use this as recent context.
-    /// </summary>
-    public IReadOnlyList<HomeEvent> GetRecentEvents(int take = 100)
+    public Task<IReadOnlyList<HomeEvent>> GetRecentEventsAsync(int take, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
-            return _events
-                .OrderByDescending(x => x.Timestamp)
-                .Take(take)
-                .ToList();
+            return Task.FromResult<IReadOnlyList<HomeEvent>>(_events.OrderByDescending(x => x.OccurredAt).Take(take).ToList());
         }
     }
 
-    /// <summary>
-    /// Builds latest device state from event history.
-    /// For each device/type pair, the newest event wins.
-    /// </summary>
-    public IReadOnlyList<DeviceState> GetCurrentDeviceStates()
+    public Task<IReadOnlyList<DeviceState>> GetCurrentDeviceStatesAsync(CancellationToken cancellationToken)
+        => Task.FromResult<IReadOnlyList<DeviceState>>(_deviceStates.Values.OrderBy(x => x.Room).ThenBy(x => x.DeviceName).ToList());
+
+    public Task AddFindingsAsync(IReadOnlyList<AgentFinding> findings, CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            return _events
-                .GroupBy(x => new { x.DeviceId, x.Type })
-                .Select(g => g.OrderByDescending(x => x.Timestamp).First())
-                .Select(x => new DeviceState(
-                    x.DeviceId,
-                    x.DeviceName,
-                    x.Room,
-                    x.Type,
-                    x.Value,
-                    x.Timestamp))
-                .ToList();
-        }
+        lock (_lock) _findings.AddRange(findings);
+        return Task.CompletedTask;
     }
 
-    public void AddFinding(AgentFinding finding)
+    public Task<IReadOnlyList<AgentFinding>> GetFindingsAsync(CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            _findings.Add(finding);
-        }
+        lock (_lock) return Task.FromResult<IReadOnlyList<AgentFinding>>(_findings.ToList());
     }
 
-    public IReadOnlyList<AgentFinding> GetFindings()
+    public Task AddRecommendationsAsync(IReadOnlyList<Recommendation> recommendations, CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            return _findings.ToList();
-        }
+        lock (_lock) _recommendations.AddRange(recommendations);
+        return Task.CompletedTask;
     }
 
-    public void AddRecommendation(Recommendation recommendation)
+    public Task<IReadOnlyList<Recommendation>> GetRecommendationsAsync(CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            _recommendations.Add(recommendation);
-        }
-    }
-
-    public IReadOnlyList<Recommendation> GetRecommendations()
-    {
-        lock (_lock)
-        {
-            return _recommendations.ToList();
-        }
-    }
-}
-
-/// <summary>
-/// Builds a compact SentraAIContext for agents.
-/// In production this would combine current state, recent events, active automations,
-/// user preferences, weather, occupancy and perhaps selected RAG memories.
-/// </summary>
-public sealed class SentraAIContextBuilder
-{
-    private readonly InMemorySentraAIStore _store;
-
-    public SentraAIContextBuilder(InMemorySentraAIStore store)
-    {
-        _store = store;
-    }
-
-    public Task<SentraAIContext> BuildAsync(CancellationToken cancellationToken)
-    {
-        var context = new SentraAIContext(
-            DateTimeOffset.UtcNow,
-            _store.GetCurrentDeviceStates(),
-            _store.GetRecentEvents());
-
-        return Task.FromResult(context);
+        lock (_lock) return Task.FromResult<IReadOnlyList<Recommendation>>(_recommendations.ToList());
     }
 }

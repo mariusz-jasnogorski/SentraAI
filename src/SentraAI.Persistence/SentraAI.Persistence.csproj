@@ -1,5 +1,3 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\SentraAI.Contracts\SentraAI.Contracts.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>
+  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+</ItemGroup><ItemGroup><ProjectReference Include="..\SentraAI.Contracts\SentraAI.Contracts.csproj" /></ItemGroup></Project>

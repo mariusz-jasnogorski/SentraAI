@@ -1,118 +1,55 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SentraAI.Contracts;
-using SentraAI.Persistence;
 
 namespace SentraAI.Agents;
 
-/// <summary>
-/// Policy engine validates whether a finding is safe and useful enough to become a recommendation.
-///
-/// This is separate from agents because agents can be wrong. Especially LLM-based agents should
-/// never be trusted blindly.
-/// </summary>
-public interface IPolicyEngine
+public sealed class DefaultPolicyEngine(IOptions<PolicyOptions> options) : IPolicyEngine
 {
-    Task<bool> AllowAsync(AgentFinding finding, CancellationToken cancellationToken);
-}
-
-public sealed class DefaultPolicyEngine : IPolicyEngine
-{
-    public Task<bool> AllowAsync(AgentFinding finding, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<AgentFinding>> FilterAsync(IReadOnlyList<AgentFinding> findings, CancellationToken cancellationToken)
     {
-        // Simple production-like safeguards.
-        if (finding.Confidence < 0.70)
-            return Task.FromResult(false);
-
-        if (finding.Severity.Equals("Critical", StringComparison.OrdinalIgnoreCase) && finding.Evidence.Count < 2)
-            return Task.FromResult(false);
-
-        return Task.FromResult(true);
-    }
-}
-
-/// <summary>
-/// Converts an approved finding into a recommendation stored in the system.
-/// </summary>
-public sealed class RecommendationService
-{
-    private readonly InMemorySentraAIStore _store;
-
-    public RecommendationService(InMemorySentraAIStore store)
-    {
-        _store = store;
-    }
-
-    public Task<Recommendation> CreateAsync(AgentFinding finding, CancellationToken cancellationToken)
-    {
-        var recommendation = new Recommendation(
-            Guid.NewGuid(),
-            finding,
-            finding.Title,
-            finding.Description,
-            DateTimeOffset.UtcNow);
-
-        _store.AddRecommendation(recommendation);
-        return Task.FromResult(recommendation);
-    }
-}
-
-/// <summary>
-/// Main orchestration pipeline.
-///
-/// It runs multiple agents, validates each finding, persists approved results and creates
-/// recommendations. This class is intentionally ignorant of notification details.
-/// </summary>
-public sealed class SentraAIAgentPipeline
-{
-    private readonly IEnumerable<ISentraAIAgent> _agents;
-    private readonly IPolicyEngine _policyEngine;
-    private readonly RecommendationService _recommendationService;
-    private readonly InMemorySentraAIStore _store;
-    private readonly ILogger<SentraAIAgentPipeline> _logger;
-
-    public SentraAIAgentPipeline(
-        IEnumerable<ISentraAIAgent> agents,
-        IPolicyEngine policyEngine,
-        RecommendationService recommendationService,
-        InMemorySentraAIStore store,
-        ILogger<SentraAIAgentPipeline> logger)
-    {
-        _agents = agents;
-        _policyEngine = policyEngine;
-        _recommendationService = recommendationService;
-        _store = store;
-        _logger = logger;
-    }
-
-    public async Task<IReadOnlyList<Recommendation>> ProcessAsync(
-        SentraAIContext context,
-        CancellationToken cancellationToken)
-    {
-        var recommendations = new List<Recommendation>();
-
-        foreach (var agent in _agents)
+        var policy = options.Value;
+        var accepted = findings.Where(f =>
         {
-            var finding = await agent.AnalyzeAsync(context, cancellationToken);
+            if (f.Confidence < policy.MinimumConfidence) return false;
+            if (f.Severity == AgentFindingSeverity.Critical)
+                return f.Confidence >= policy.CriticalMinimumConfidence && f.Evidence.Count >= policy.CriticalMinimumEvidenceCount;
+            return true;
+        }).ToList();
 
-            if (finding is null)
-                continue;
+        return Task.FromResult<IReadOnlyList<AgentFinding>>(accepted);
+    }
+}
 
-            _store.AddFinding(finding);
+public sealed class RecommendationService(ISentraAIStore store) : IRecommendationService
+{
+    public async Task<IReadOnlyList<Recommendation>> CreateRecommendationsAsync(IReadOnlyList<AgentFinding> findings, CancellationToken cancellationToken)
+    {
+        var recommendations = findings.Select(f => new Recommendation(
+            Guid.NewGuid().ToString("N"), f.Id, f.Title, f.Description, f.SuggestedActionType, RequiresApproval(f), DateTimeOffset.UtcNow, f.SuggestedActionPayload)).ToList();
 
-            var allowed = await _policyEngine.AllowAsync(finding, cancellationToken);
+        await store.AddRecommendationsAsync(recommendations, cancellationToken);
+        return recommendations;
+    }
 
-            if (!allowed)
-            {
-                _logger.LogInformation("Finding rejected by policy: {Title}", finding.Title);
-                continue;
-            }
+    private static bool RequiresApproval(AgentFinding finding)
+        => finding.Severity >= AgentFindingSeverity.High || finding.SuggestedActionType is RecommendationActionType.RequestApproval or RecommendationActionType.ExecuteAfterApproval;
+}
 
-            var recommendation = await _recommendationService.CreateAsync(finding, cancellationToken);
-            recommendations.Add(recommendation);
-
-            _logger.LogInformation("Recommendation created: {Title}", recommendation.MessageTitle);
+public sealed class SentraAIAgentPipeline(IEnumerable<ISentraAIAgent> agents, IPolicyEngine policyEngine, IRecommendationService recommendationService, ISentraAIStore store, ILogger<SentraAIAgentPipeline> logger) : ISentraAIAgentPipeline
+{
+    public async Task<IReadOnlyList<Recommendation>> RunAsync(SentraAIContext context, CancellationToken cancellationToken)
+    {
+        var findings = new List<AgentFinding>();
+        foreach (var agent in agents)
+        {
+            var result = await agent.AnalyzeAsync(context, cancellationToken);
+            logger.LogInformation("Agent {AgentName} returned {Count} findings", agent.Name, result.Count);
+            findings.AddRange(result);
         }
 
-        return recommendations;
+        var accepted = await policyEngine.FilterAsync(findings, cancellationToken);
+        await store.AddFindingsAsync(accepted, cancellationToken);
+        return await recommendationService.CreateRecommendationsAsync(accepted, cancellationToken);
     }
 }

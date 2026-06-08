@@ -1,35 +1,61 @@
 # SentraAI
 
-A clean .NET 10 LTS solution for an agentic AI Sentra AI MVP.
+Clean .NET 10 solution for an agentic smart-home AI MVP.
 
-The solution demonstrates:
+This generated version is prepared for two deployment styles:
 
-- Vera-like event simulation
-- real Vera Plus / Vera Edge integration through a generic smart home adapter
-- normalized Sentra AI events
-- in-memory persistence for local demo mode
-- rule-based anomaly detection
-- automation discovery
-- generic tool-based LLM anomaly agent
-- fake LLM client for local execution without API keys
-- policy-controlled recommendations
-- user-facing communication flow
-- local-safe observability setup
-- central package version management
+1. **Local all-in-one**: `SentraAI.App` runs in the same network as the smart-home controller.
+2. **Azure/Core + local Connector**: `SentraAI.Api` can run in Azure, while `SentraAI.Connector.Worker` runs locally in the LAN/VPN where Vera/Home Assistant/Fibaro/MQTT/KNX controller is reachable.
 
-## Why this ZIP is clean
+## Key architecture rule
 
-This version avoids the previous NuGet downgrade issues by using:
+The connector must run in the network that can reach the smart-home controller. The cloud/core side should not need direct access to `192.168.x.x` controller addresses.
 
-- `net10.0` consistently across every project
-- `Directory.Build.props` for common project settings
-- `Directory.Packages.props` for central package versions
-- no mixed `Microsoft.Extensions.*` 8.x and 9.x dependency stack
-- no forced Azure Monitor exporter package during local development
+```text
+Local LAN/VPN near controller
+  SentraAI.Connector.Worker
+    -> reads Vera/Home Assistant/MQTT/etc.
+    -> normalizes to HomeEvent
+    -> publishes events through IHomeEventPublisher
 
-Application Insights is configuration-ready, but not forced at startup. The app runs locally even when `APPLICATIONINSIGHTS_CONNECTION_STRING` is missing.
+Azure or local machine
+  SentraAI.Api / SentraAI.App
+    -> receives HomeEvent
+    -> persists events
+    -> builds context
+    -> runs agents
+    -> applies policy
+    -> creates recommendations
+    -> sends notifications
+```
 
-## Run
+## Projects
+
+```text
+src/SentraAI.App                 Local all-in-one runner
+src/SentraAI.Api                 HTTP API for cloud/local core event ingestion
+src/SentraAI.Connector.Worker    Local connector that runs near the controller
+src/SentraAI.Contracts           Domain models, options and abstractions
+src/SentraAI.Persistence         In-memory ISentraAIStore implementation
+src/SentraAI.Integrations        Fake and Vera smart-home event sources
+src/SentraAI.Agents              Agents, tools, policy, pipeline, orchestrator, publishers
+src/SentraAI.Notifications       User communication and console notification channel
+src/SentraAI.Observability       Local-safe logging setup
+tests/SentraAI.Agents.Tests      Basic behavior tests
+```
+
+## Main changes
+
+- Added `ISentraAIStore`; agents and pipeline no longer depend on `InMemorySentraAIStore`.
+- Changed agent contract to return many findings: `Task<IReadOnlyList<AgentFinding>>`.
+- Added `SentraAIOrchestrator`; `Program.cs` is now only startup/composition code.
+- Added `IHomeEventPublisher`, `InProcessHomeEventPublisher`, and `HttpHomeEventPublisher`.
+- Added `SentraAI.Api` with `POST /api/home-events`.
+- Added `SentraAI.Connector.Worker`, intended to run in the same LAN/VPN as the smart-home controller.
+- Added Dockerfiles and `docker-compose.local.yml`.
+- Agents may recommend; they do not execute physical smart-home actions.
+
+## Run local all-in-one
 
 ```bash
 dotnet restore
@@ -37,104 +63,53 @@ dotnet build
 dotnet run --project src/SentraAI.App/SentraAI.App.csproj
 ```
 
-## Test
+## Run API locally
+
+```bash
+dotnet run --project src/SentraAI.Api/SentraAI.Api.csproj --urls http://localhost:5100
+```
+
+Health check:
+
+```bash
+curl http://localhost:5100/health
+```
+
+## Run connector locally
+
+The connector should be started on a machine that has network access to the smart-home controller.
+
+```bash
+dotnet run --project src/SentraAI.Connector.Worker/SentraAI.Connector.Worker.csproj
+```
+
+For Azure, set environment variables on the connector machine:
+
+```bash
+EventPublishing__Mode=Http
+EventPublishing__Endpoint=https://<your-sentraai-api>.azurewebsites.net/api/home-events
+EventPublishing__ApiKey=<your-api-key>
+SmartHomeIntegration__Provider=Vera
+Vera__BaseUrl=http://192.168.1.50:3480/
+```
+
+## Docker local API + connector
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+## Tests
 
 ```bash
 dotnet test
 ```
 
-## Projects
-
-```text
-src/SentraAI.App              Console host / local runner
-src/SentraAI.Contracts        Shared domain models and interfaces
-src/SentraAI.Persistence      In-memory store
-src/SentraAI.Integrations    Generic smart home integration abstraction, Fake source and Vera adapter
-src/SentraAI.Agents           Rule agent, automation agent, LLM agent, tools, policy pipeline
-src/SentraAI.Notifications    Communication agent and console notification channel
-src/SentraAI.Observability    Local-safe observability configuration adapter
-tests/SentraAI.Agents.Tests   Basic policy tests
-```
-
 ## Production next steps
 
-For real production deployment, replace demo pieces gradually:
-
-1. Switch `SmartHomeIntegration:Provider` from `Fake` to `Vera` and set `Vera:BaseUrl`.
-2. Replace `InMemorySentraAIStore` with PostgreSQL / EF Core.
-3. Replace `FakeLlmClient` with Ollama, OpenAI, or Azure OpenAI.
-4. Add RabbitMQ / Azure Service Bus between collector and agent service.
-5. Add Azure Monitor / Application Insights exporter after selecting package versions compatible with your .NET target.
-6. Add a user interface for accepting/rejecting automation suggestions.
-
-## Safety rule
-
-Agents may reason, recommend, and explain.
-Agents must not directly execute physical Sentra AI actions.
-Execution should always go through policy validation and user approval.
-
-
-## .NET 10 upgrade notes
-
-This package targets `net10.0` and uses Microsoft.Extensions `10.0.0` packages consistently.
-Install the .NET 10 SDK before building. The included `global.json` requests SDK `10.0.201` and rolls forward to the latest feature band if available.
-
-Application Insights / Azure Monitor remains optional for local runs. If `APPLICATIONINSIGHTS_CONNECTION_STRING` is not set, the application uses console/local telemetry only.
-
-## Smart home integrations
-
-The solution now uses a vendor-neutral interface:
-
-```csharp
-ISmartHomeEventSource
-```
-
-The agent pipeline receives normalized `HomeEvent` records and does not know whether the data came from Vera, a simulator, or a future platform. This keeps the design open for Home Assistant, Fibaro, MQTT, KNX or another smart home system.
-
-### Local simulator mode
-
-This is the default mode and requires no hardware:
-
-```json
-{
-  "SmartHomeIntegration": {
-    "Provider": "Fake"
-  }
-}
-```
-
-### Real Vera Plus / Vera Edge mode
-
-Set the provider to `Vera` and point `BaseUrl` to the local Vera controller address:
-
-```json
-{
-  "SmartHomeIntegration": {
-    "Provider": "Vera"
-  },
-  "Vera": {
-    "BaseUrl": "http://192.168.1.50:3480/"
-  }
-}
-```
-
-The Vera adapter calls:
-
-```text
-/data_request?id=sdata&output_format=json
-```
-
-and maps Vera devices into normalized SentraAI `HomeEvent` records.
-
-### Future integrations
-
-To add another smart home system, create a new class that implements:
-
-```csharp
-public interface ISmartHomeEventSource
-{
-    Task<IReadOnlyList<HomeEvent>> ReadEventsAsync(CancellationToken cancellationToken);
-}
-```
-
-Then register it in `AddSentraAISmartHomeIntegration`. The agents, policies, recommendations and notifications do not need to change.
+1. Replace `InMemorySentraAIStore` with PostgreSQL/EF Core or Azure SQL.
+2. Replace `HttpHomeEventPublisher` with Azure Service Bus publisher/consumer for reliable cloud ingestion.
+3. Replace `FakeLlmClient` with Azure OpenAI/OpenAI/Ollama implementation.
+4. Add user approval UI before any physical action executor.
+5. Add durable idempotency for `HomeEvent.Id` and connector retries.
+6. Add Application Insights/OpenTelemetry exporter after selecting final package versions.

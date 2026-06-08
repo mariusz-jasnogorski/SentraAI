@@ -1,186 +1,48 @@
-using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using SentraAI.Contracts;
+using System.Text.Json;
 
 namespace SentraAI.Agents;
 
-/// <summary>
-/// Tool-based LLM anomaly agent.
-///
-/// This is the central agentic component of the demo. It implements a bounded ReAct-like
-/// loop:
-/// 1. Build prompt from current context and previous observations.
-/// 2. Ask LLM what to do next.
-/// 3. If LLM requests a tool, execute only an allowlisted tool.
-/// 4. Feed observation back to the LLM.
-/// 5. Stop when the LLM returns a structured final finding.
-///
-/// Safety principles:
-/// - bounded number of steps
-/// - tool allowlist
-/// - timeout per tool call
-/// - confidence threshold
-/// - structured output only
-/// - no physical action execution
-/// </summary>
-public sealed class LlmAnomalyAgent : ILlmAgent, ISentraAIAgent
+public sealed class LlmAnomalyAgent(ILlmClient llmClient, IEnumerable<IAgentTool> tools) : ISentraAIAgent
 {
-    private readonly ILlmClient _llmClient;
-    private readonly AgentToolRegistry _tools;
-    private readonly LlmAgentOptions _options;
-    private readonly ILogger<LlmAnomalyAgent> _logger;
+    public string Name => nameof(LlmAnomalyAgent);
 
-    public LlmAnomalyAgent(
-        ILlmClient llmClient,
-        AgentToolRegistry tools,
-        IOptions<LlmAgentOptions> options,
-        ILogger<LlmAnomalyAgent> logger)
+    public async Task<IReadOnlyList<AgentFinding>> AnalyzeAsync(SentraAIContext context, CancellationToken cancellationToken)
     {
-        _llmClient = llmClient;
-        _tools = tools;
-        _options = options.Value;
-        _logger = logger;
-    }
-
-    public async Task<AgentFinding?> AnalyzeAsync(SentraAIContext context, CancellationToken cancellationToken)
-    {
-        var observations = new List<string>();
-
-        for (var step = 1; step <= _options.MaxSteps; step++)
+        var toolDescriptors = tools.Select(t => new AgentToolDescriptor(t.Name, "Safe read-only SentraAI tool", "{}")).ToList();
+        var compactContext = JsonSerializer.Serialize(new
         {
-            var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(context, observations);
+            devices = context.Devices.Select(d => new { d.DeviceName, d.Room, d.Kind, d.CurrentValue, d.LastUpdatedAt }),
+            recentEvents = context.RecentEvents.Take(20).Select(e => new { e.DeviceName, e.Room, e.Type, e.Value, e.OccurredAt })
+        });
 
-            _logger.LogInformation("LLM anomaly agent step {Step} started", step);
+        var response = await llmClient.CompleteAsync(new LlmRequest(
+            "You are a read-only smart-home anomaly analyst. You may recommend but never execute physical actions.",
+            compactContext,
+            toolDescriptors), cancellationToken);
 
-            var rawResponse = await _llmClient.CompleteAsync(systemPrompt, userPrompt, cancellationToken);
-            var decision = AgentDecisionParser.Parse(rawResponse);
+        if (string.IsNullOrWhiteSpace(response.Content)) return [];
 
-            if (decision.IsFinal)
-            {
-                var result = decision.FinalResult;
+        try
+        {
+            using var document = JsonDocument.Parse(response.Content);
+            var root = document.RootElement;
+            var confidence = root.TryGetProperty("confidence", out var c) ? c.GetDouble() : 0.5;
+            if (confidence < 0.55) return [];
 
-                if (result is null)
-                    return null;
+            var title = root.TryGetProperty("title", out var t) ? t.GetString() ?? "LLM finding" : "LLM finding";
+            var description = root.TryGetProperty("description", out var d) ? d.GetString() ?? title : title;
+            var severity = root.TryGetProperty("severity", out var s) && Enum.TryParse<AgentFindingSeverity>(s.GetString(), true, out var parsed)
+                ? parsed
+                : AgentFindingSeverity.Info;
 
-                if (result.Confidence < _options.MinimumConfidence)
-                {
-                    _logger.LogInformation(
-                        "LLM finding discarded because confidence {Confidence} is below threshold {Threshold}",
-                        result.Confidence,
-                        _options.MinimumConfidence);
-
-                    return null;
-                }
-
-                _logger.LogInformation(
-                    "LLM anomaly agent produced final finding: {Title}, confidence {Confidence}",
-                    result.Title,
-                    result.Confidence);
-
-                return result;
-            }
-
-            if (string.IsNullOrWhiteSpace(decision.ToolName) || decision.ToolArguments is null)
-            {
-                _logger.LogWarning("LLM requested invalid tool call");
-                return null;
-            }
-
-            if (!_tools.TryGet(decision.ToolName, out var tool))
-            {
-                _logger.LogWarning("LLM requested unknown tool {ToolName}", decision.ToolName);
-                return null;
-            }
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(_options.ToolTimeout);
-
-            var toolResult = await tool.ExecuteAsync(decision.ToolArguments.Value, timeoutCts.Token);
-
-            observations.Add($"Tool={tool.Name}; Success={toolResult.Success}; Data={toolResult.Data}; Error={toolResult.Error}");
-
-            _logger.LogInformation(
-                "LLM agent executed tool {ToolName}. Success={Success}",
-                tool.Name,
-                toolResult.Success);
+            return [new AgentFinding(Guid.NewGuid().ToString("N"), Name, title, description, severity, confidence,
+                [new AgentEvidence("LLM", "Structured LLM review of compact context", DateTimeOffset.UtcNow)],
+                RecommendationActionType.NotifyUser)];
         }
-
-        _logger.LogInformation("LLM anomaly agent reached max steps without final result");
-        return null;
-    }
-
-    private static string BuildSystemPrompt()
-    {
-        // Plain raw string is enough because this prompt does not need C# interpolation.
-        return """
-        You are a Sentra AI anomaly detection agent.
-
-        Rules:
-        - Detect unusual Sentra AI situations.
-        - Use tools before making conclusions when data is missing.
-        - Do not invent facts.
-        - Never execute physical actions directly.
-        - Only recommend actions.
-        - Return only valid JSON.
-
-        Return one of two JSON shapes:
-
-        Tool call:
+        catch (JsonException)
         {
-          "type": "tool_call",
-          "toolName": "query_recent_events",
-          "arguments": { "room": "LivingRoom", "take": 20 }
+            return [];
         }
-
-        Final result:
-        {
-          "type": "final",
-          "findingType": "LlmAnomaly",
-          "title": "...",
-          "description": "...",
-          "severity": "Low|Medium|High|Critical",
-          "confidence": 0.0,
-          "evidence": ["..."],
-          "recommendedActions": ["..."]
-        }
-        """;
-    }
-
-    private string BuildUserPrompt(SentraAIContext context, IReadOnlyList<string> observations)
-    {
-        var toolsDescription = string.Join(
-            Environment.NewLine,
-            _tools.GetAll().Select(x => $"- {x.Name}: {x.Description}"));
-
-        var compactContext = new
-        {
-            context.CreatedAt,
-            Devices = context.Devices.Select(x => new
-            {
-                x.Room,
-                x.DeviceName,
-                x.Type,
-                x.Value,
-                x.LastUpdatedAt
-            })
-        };
-
-        // Interpolated raw string with $$ is used because the prompt contains JSON braces.
-        // With $$, single { } characters are treated as normal content, while C# interpolation
-        // uses double braces like {{variable}}.
-        return $$"""
-        Available tools:
-        {{toolsDescription}}
-
-        Current compact Sentra AI context:
-        {{JsonSerializer.Serialize(compactContext)}}
-
-        Previous observations:
-        {{string.Join(Environment.NewLine, observations)}}
-
-        Decide the next step.
-        """;
     }
 }
