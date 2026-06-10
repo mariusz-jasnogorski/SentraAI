@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <ItemGroup>
+    <ProjectReference Include="..\SentraAI.Contracts\SentraAI.Contracts.csproj" />
+    <ProjectReference Include="..\SentraAI.Notifications\SentraAI.Notifications.csproj" />
+    <ProjectReference Include="..\SentraAI.Messaging\SentraAI.Messaging.csproj" />
+    <ProjectReference Include="..\SentraAI.Observability\SentraAI.Observability.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+</Project>

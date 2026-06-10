@@ -1,0 +1,67 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sentraai-api:
+    build:
+      context: .
+      dockerfile: src/SentraAI.Api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      EventPublishing__ApiKey: "dev-local-key"
+
+  sentraai-connector-worker:
+    build:
+      context: .
+      dockerfile: src/SentraAI.Connector.Worker/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SmartHomeIntegration__Provider: "Fake"
+      EventPublishing__Mode: "RabbitMq"
+      RabbitMq__HostName: "rabbitmq"
+      RabbitMq__Port: "5672"
+      RabbitMq__UserName: "guest"
+      RabbitMq__Password: "guest"
+      Connector__PollingIntervalSeconds: "30"
+      StateTracking__EmitInitialSnapshot: "true"
+
+  sentraai-agent-service:
+    build:
+      context: .
+      dockerfile: src/SentraAI.AgentService/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RabbitMq__HostName: "rabbitmq"
+      RabbitMq__Port: "5672"
+      RabbitMq__UserName: "guest"
+      RabbitMq__Password: "guest"
+
+  sentraai-notification-service:
+    build:
+      context: .
+      dockerfile: src/SentraAI.NotificationService/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RabbitMq__HostName: "rabbitmq"
+      RabbitMq__Port: "5672"
+      RabbitMq__UserName: "guest"
+      RabbitMq__Password: "guest"
